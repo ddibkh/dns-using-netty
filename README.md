@@ -1,6 +1,39 @@
 # dns-using-netty
 dns resolver using netty A, MX, TXT, NS type record
 
+# dependency
+```
+<parent>
+	<groupId>org.springframework.boot</groupId>
+	<artifactId>spring-boot-starter-parent</artifactId>
+	<version>2.3.4.RELEASE</version>
+	<relativePath/> <!-- lookup parent from repository -->
+</parent>
+    
+<dependency>
+	<groupId>org.springframework.boot</groupId>
+		<artifactId>spring-boot-starter</artifactId>
+	</dependency>
+
+	<dependency>
+		<groupId>org.springframework.boot</groupId>
+		<artifactId>spring-boot-starter-test</artifactId>
+		<scope>test</scope>
+	</dependency>
+
+	<dependency>
+		<groupId>org.projectlombok</groupId>
+		<artifactId>lombok</artifactId>
+		<optional>true</optional>
+	</dependency>
+
+	<dependency>
+		<groupId>io.netty</groupId>
+		<artifactId>netty-all</artifactId>
+		<version>4.1.53.Final</version>
+</dependency>
+```
+
 ## DnsResolver::resolveDomain 호출
 - 기본적으로 netty dns 처리 핸들러는 SimpleChannelInboundHandler 를 사용한다.
 ```
@@ -49,4 +82,58 @@ List<AResult> result = handler.getResult();      //A record 조회 결과
 List<MXResult> result = handler.getResult();     //MX record 조회 결과 (preference 로 정렬됨)
 List<NSResult> result = handler.getResult();     //NS record 조회 결과
 List<TXTResult> result = handler.getResult();    //TXT record 조회 결과
+```
+
+## example (DnsResolverTest.java 참조)
+1. TCP MX 레코드 조회
+```
+        try
+        {
+            DnsResolver dnsResolver = new DnsResolver();
+            DnsResponseHandler< DefaultDnsResponse > handler = new DnsResponseHandlerMX<>(DefaultDnsResponse.class);
+            //mx record
+            dnsResolver.resolveDoamin("",
+                    10,
+                    "google.com",
+                    protocol.TCP,
+                    handler
+            );
+
+            List results = handler.getResult();
+            results.stream().forEach(System.out::println);
+        }
+        catch( DnsException e )
+        {
+            System.out.println(e.getMessage());
+        }
+        catch( InterruptedException ie )
+        {
+            System.out.println(ie.getMessage());
+        }
+```
+2. UDP MX 레코드 조회
+```
+        try
+        {
+            DnsResolver dnsResolver = new DnsResolver();
+            DnsResponseHandler< DatagramDnsResponse > handler = new DnsResponseHandlerMX<>(DatagramDnsResponse.class);
+            //mx record
+            dnsResolver.resolveDoamin("",
+                    10,
+                    "google.com",
+                    protocol.UDP,
+                    handler
+            );
+
+            List results = handler.getResult();
+            results.stream().forEach(System.out::println);
+        }
+        catch( DnsException e )
+        {
+            System.out.println(e.getMessage());
+        }
+        catch( InterruptedException ie )
+        {
+            System.out.println(ie.getMessage());
+        }
 ```
