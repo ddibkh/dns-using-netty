@@ -34,106 +34,152 @@ dns resolver using netty A, MX, TXT, NS type record
 </dependency>
 ```
 
-## DnsResolver::resolveDomain 호출
+## DnsResolver::resolveDomainBy[Tcp|Udp] 호출
 - 기본적으로 netty dns 처리 핸들러는 SimpleChannelInboundHandler 를 사용한다.
+- 인터페이스 정의
 ```
-public < T extends DnsResponseHandler >
-    void resolveDoamin(@NonNull String dnsIp,
-                       @NonNull Integer dnsTimeout,
-                       @NonNull String domainName,
-                       @NonNull protocol pt,
-                       @NonNull T handler) throws DnsException, InterruptedException
+public interface DnsResolver
+{
+    static short getRandomId()
+    {
+        return (short)new Random().nextInt(1 << 15);
+    }
 
-* dnsIp 가 "" 인 경우 디폴트로 dns server 는 google dns(8.8.8.8) 가 셋팅됨.
-* dnsTimeout 값이 <=0 인 경우 디폴트로 10초로 셋팅됨.
-* protocol
-  protocol.TCP : TCP 방식 사용
-  protocol.UDP : UDP 방식 사용
-```
+    <T extends DnsResult > List< T >
+    resolveDomainByTcp(String dnsServer, String domainName) throws DnsException;
+    <T extends DnsResult> List< T >
+    resolveDomainByUdp(String dnsServer, String domainName) throws DnsException;
+}
 
-## handler 생성
-  제너릭 파라미터로 DefaultDnsResponse 는 TCP 방식을 사용시 셋팅한다.
-  제너릭 파라미터로 DatagramDnsResponse 는 UDP 방식을 사용시 셋팅한다.
-1. MX 레코드 조회
-```
-DnsResponseHandler<[DefaultDnsResponse | DatagramDnsResponse]> handler = 
-  new DnsResponseHandlerMX<>([DefaultDnsResponse.class | DatagramDnsResponse.class]);
-```
-2. A 레코드 조회
-```
-DnsResponseHandler<[DefaultDnsResponse | DatagramDnsResponse]> handler = 
-  new DnsResponseHandlerA<>([DefaultDnsResponse.class | DatagramDnsResponse.class]);
-```
-3. NS 레코드 조회
-```
-DnsResponseHandler<[DefaultDnsResponse | DatagramDnsResponse]> handler = 
-  new DnsResponseHandlerNS<>([DefaultDnsResponse.class | DatagramDnsResponse.class]);
-```
-4. TXT 레코드 조회
-```
-DnsResponseHandler<[DefaultDnsResponse | DatagramDnsResponse]> handler = 
-  new DnsResponseHandlerTXT<>([DefaultDnsResponse.class | DatagramDnsResponse.class]);
+* dnsIp : DNS 서버 지정. (empty 인 경우 디폴트로 dns server 는 google dns(8.8.8.8) 가 셋팅됨)
+* domainName : 조회하고자 하는 domain
+* dnsTimeout 값이 디폴트로 10초로 사용함.
 ```
 
-## 조회 결과
-resolveDoamin 호출 이후 handler 의 getResult 를 호출
+## bootstrap bean 생성
+  TCP, UDP 프로토콜 별로 MX, NS, TXT, A 레코드 조회에 대한 각각의 bootstrap 를 Bean 으로 등록하여 사용한다.
+  EventLoopGroup 은 하나의 EventLoopGroup 으로 공유한다.
+  
+# TCP 프로토콜로 MX 레코드 조회를 위한 bootstrap 생성
 ```
-List<AResult> result = handler.getResult();      //A record 조회 결과
-List<MXResult> result = handler.getResult();     //MX record 조회 결과 (preference 로 정렬됨)
-List<NSResult> result = handler.getResult();     //NS record 조회 결과
-List<TXTResult> result = handler.getResult();    //TXT record 조회 결과
+@Bean
+@Lazy
+public Bootstrap tcpMxBootstrap()
+{
+    //default timeout 10
+    Bootstrap b = new Bootstrap();
+    b.group(eventLoopGroup());
+    b.channel(NioSocketChannel.class);
+    b.option(ChannelOption.CONNECT_TIMEOUT_MILLIS, 10000);
+    b.handler(new ChannelInitializer< SocketChannel >()
+    {
+        @Override
+        protected void initChannel(SocketChannel socketChannel)
+        {
+            ChannelPipeline p = socketChannel.pipeline();
+
+            //tcp protocol
+            p.addLast(new ReadTimeoutHandler(10))
+                .addLast(new WriteTimeoutHandler(10))
+                .addLast(new TcpDnsQueryEncoder())
+                .addLast(new TcpDnsResponseDecoder())
+                .addLast(new DnsResponseHandlerMX<>(DefaultDnsResponse.class));
+        }
+    });
+    return b;
+}
 ```
+# UDP 프로토콜로 MX 레코드 조회를 위한 bootstrap 생성 
+```
+@Bean
+@Lazy
+public Bootstrap udpMxBootstrap()
+{
+    //UDP 의 경우 timeout 처리는 resolver 내에서 처리한다.
+    Bootstrap b = new Bootstrap();
+    b.group(eventLoopGroup());
+    b.channel(NioDatagramChannel.class);
+    b.handler(new ChannelInitializer< DatagramChannel >()
+    {
+        @Override
+        protected void initChannel(DatagramChannel socketChannel)
+        {
+            ChannelPipeline p = socketChannel.pipeline();
+
+            p.addLast(new DatagramDnsQueryEncoder())
+                .addLast(new DatagramDnsResponseDecoder())
+                .addLast(new DnsResponseHandlerMX<>(DatagramDnsResponse.class));
+        }
+    });
+    return b;
+}
+```
+
+## 각 bootstrap bean 을 주입하여 사용한다.
+```
+@Resource(name="dnsResolverMX")
+private DnsResolver dnsResolverMX;
+@Resource(name="dnsResolverTXT")
+private DnsResolver dnsResolverTXT;
+@Resource(name="dnsResolverA")
+private DnsResolver dnsResolverA;
+@Resource(name="dnsResolverNS")
+private DnsResolver dnsResolverNS;
+
+혹은 생성자 주입.
+```
+# 조회 결과
+DnsResolver::resolveDomainBy[Tcp|Udp] 의 리턴타입은 List<DnsResult> 이다.
+List<DnsResult> 를 이용한다. (MX 레코드 조회의 경우 preference 값을 사용하려면
+List<MXRecord> 로 결과를 받아 사용한다.)
+ 
 
 ## example (DnsResolverTest.java 참조)
-1. TCP MX 레코드 조회
+# TCP MX 레코드 조회
 ```
-        try
-        {
-            DnsResolver dnsResolver = new DnsResolver();
-            DnsResponseHandler< DefaultDnsResponse > handler = new DnsResponseHandlerMX<>(DefaultDnsResponse.class);
-            //mx record
-            dnsResolver.resolveDoamin("",
-                    10,
-                    "google.com",
-                    protocol.TCP,
-                    handler
-            );
+@Resource(name="dnsResolverMX")
+private DnsResolver dnsResolverMX;
 
-            List results = handler.getResult();
-            results.stream().forEach(System.out::println);
-        }
-        catch( DnsException e )
-        {
-            System.out.println(e.getMessage());
-        }
-        catch( InterruptedException ie )
-        {
-            System.out.println(ie.getMessage());
-        }
+@Test
+void mxResolveConfiguration()
+{
+    try
+    {
+        dnsResolverMX.resolveDomainByTcp("","google.com")
+                .stream().forEach(System.out::println);
+    }
+    catch( DnsException de )
+    {
+        System.out.println(de.getMessage());
+    }
+    catch( Exception e )
+    {
+        System.out.println(e.getMessage());
+        e.printStackTrace();
+    }
+}
 ```
-2. UDP MX 레코드 조회
+# UDP MX 레코드 조회
 ```
-        try
-        {
-            DnsResolver dnsResolver = new DnsResolver();
-            DnsResponseHandler< DatagramDnsResponse > handler = new DnsResponseHandlerMX<>(DatagramDnsResponse.class);
-            //mx record
-            dnsResolver.resolveDoamin("",
-                    10,
-                    "google.com",
-                    protocol.UDP,
-                    handler
-            );
+@Resource(name="dnsResolverMX")
+private DnsResolver dnsResolverMX;
 
-            List results = handler.getResult();
-            results.stream().forEach(System.out::println);
-        }
-        catch( DnsException e )
-        {
-            System.out.println(e.getMessage());
-        }
-        catch( InterruptedException ie )
-        {
-            System.out.println(ie.getMessage());
-        }
+@Test
+void mxResolveConfiguration()
+{
+    try
+    {
+        dnsResolverMX.resolveDomainByUdp("","google.com")
+                .stream().forEach(System.out::println);
+    }
+    catch( DnsException de )
+    {
+        System.out.println(de.getMessage());
+    }
+    catch( Exception e )
+    {
+        System.out.println(e.getMessage());
+        e.printStackTrace();
+    }
+}
 ```

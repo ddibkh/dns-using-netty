@@ -1,14 +1,31 @@
 package netty.dns.result;
 
-import lombok.AllArgsConstructor;
 import lombok.Data;
-import lombok.NoArgsConstructor;
 
 @Data
-@AllArgsConstructor
-@NoArgsConstructor
-public class MXResult
+public class MXResult extends DnsResult
 {
-    private int preference;
-    private String hostname;
+    private final int preference;
+    public MXResult(int preference, String record)
+    {
+        super(DnsResult.Type.MX, record);
+        this.preference = preference;
+    }
+
+    public String getRecord()
+    {
+        return super.getRecord();
+    }
+
+    public DnsResult.Type getType() { return super.getType(); }
+
+    @Override
+    public String toString()
+    {
+        return "MXResult{" +
+                "type=" + getType() +
+                ", preference=" + preference +
+                ", record='" + getRecord() + '\'' +
+                '}';
+    }
 }

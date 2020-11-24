@@ -1,125 +1,114 @@
 package netty.dns;
 
-import io.netty.handler.codec.dns.DatagramDnsResponse;
-import io.netty.handler.codec.dns.DefaultDnsResponse;
-import netty.dns.handler.*;
-import org.junit.jupiter.api.DisplayName;
+import netty.dns.handler.DnsException;
+import netty.dns.result.DnsResult;
 import org.junit.jupiter.api.Test;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.test.context.SpringBootTest;
 
+import javax.annotation.Resource;
 import java.util.List;
 
+@SpringBootTest( classes = {
+        DnsResolverMX.class,
+        DnsResolverTXT.class,
+        DnsResolverA.class,
+        DnsResolverNS.class,
+        DnsConfiguration.class
+} )
 class DnsResolverTest
 {
+    @Resource(name="dnsResolverMX")
+    private DnsResolver dnsResolverMX;
+    @Resource(name="dnsResolverTXT")
+    private DnsResolver dnsResolverTXT;
+    @Resource(name="dnsResolverA")
+    private DnsResolver dnsResolverA;
+    @Resource(name="dnsResolverNS")
+    private DnsResolver dnsResolverNS;
+
     @Test
-    void resolveMxRecordTCP()
+    void mxResolveConfiguration()
     {
         try
         {
-            DnsResolver dnsResolver = new DnsResolver();
-            DnsResponseHandler< DefaultDnsResponse > handler = new DnsResponseHandlerMX<>(DefaultDnsResponse.class);
-            //mx record
-            dnsResolver.resolveDoamin("",
-                    10,
-                    "google.com",
-                    protocol.TCP,
-                    handler
-            );
+            dnsResolverMX.resolveDomainByTcp("","google.com")
+                .stream().forEach(System.out::println);
 
-            List results = handler.getResult();
-            results.stream().forEach(System.out::println);
+            dnsResolverMX.resolveDomainByUdp("8.8.8.8", "google.com")
+                .stream().forEach(System.out::println);
         }
-        catch( DnsException e )
+        catch( DnsException de )
+        {
+            System.out.println(de.getMessage());
+        }
+        catch( Exception e )
         {
             System.out.println(e.getMessage());
-        }
-        catch( InterruptedException ie )
-        {
-            System.out.println(ie.getMessage());
+            e.printStackTrace();
         }
     }
 
     @Test
-    void resolveNSRecordUDP()
+    void txtResolveConfiguration()
     {
         try
         {
-            DnsResolver dnsResolver = new DnsResolver();
-            DnsResponseHandler< DatagramDnsResponse > handler = new DnsResponseHandlerNS<>(DatagramDnsResponse.class);
-            //ns record
-            dnsResolver.resolveDoamin("",
-                    10,
-                    "google.com",
-                    protocol.UDP,
-                    handler
-            );
+            dnsResolverTXT.resolveDomainByTcp("", "google.com")
+                    .stream().forEach(System.out::println);
 
-            List results = handler.getResult();
-            results.stream().forEach(System.out::println);
+            dnsResolverTXT.resolveDomainByUdp("","google.com")
+                    .stream().forEach(System.out::println);
         }
-        catch( DnsException e )
+        catch( DnsException de )
         {
-            System.out.println(e.getMessage());
+            System.out.println(de.getMessage());
         }
-        catch( InterruptedException ie )
+        catch( Exception e )
         {
-            System.out.println(ie.getMessage());
+            e.printStackTrace();
         }
     }
 
     @Test
-    void resolveTXTRecordTCP()
+    void nsResolveConfiguration()
     {
         try
         {
-            DnsResolver dnsResolver = new DnsResolver();
-            DnsResponseHandler< DefaultDnsResponse > handler = new DnsResponseHandlerTXT<>(DefaultDnsResponse.class);
-            //txt record
-            dnsResolver.resolveDoamin("",
-                    10,
-                    "google.com",
-                    protocol.TCP,
-                    handler
-            );
+            dnsResolverNS.resolveDomainByTcp("", "google.com")
+                    .stream().forEach(System.out::println);
 
-            List results = handler.getResult();
-            results.stream().forEach(System.out::println);
+            dnsResolverNS.resolveDomainByUdp("","google.com")
+                    .stream().forEach(System.out::println);
         }
-        catch( DnsException e )
+        catch( DnsException de )
         {
-            System.out.println(e.getMessage());
+            System.out.println(de.getMessage());
         }
-        catch( InterruptedException ie )
+        catch( Exception e )
         {
-            System.out.println(ie.getMessage());
+            e.printStackTrace();
         }
     }
 
     @Test
-    @DisplayName("resolve txt _dmarc record")
-    void resolveTXTRecordDmarcUDP()
+    void aResolveConfiguration()
     {
         try
         {
-            DnsResolver dnsResolver = new DnsResolver();
-            DnsResponseHandler< DatagramDnsResponse > handler = new DnsResponseHandlerTXT<>(DatagramDnsResponse.class);
-            //txt _dmarc record
-            dnsResolver.resolveDoamin("",
-                    10,
-                    "_dmarc.gmail.com",
-                    protocol.UDP,
-                    handler
-            );
+            dnsResolverA.resolveDomainByTcp("", "google.com")
+                    .stream().forEach(System.out::println);
 
-            List results = handler.getResult();
-            results.stream().forEach(System.out::println);
+            dnsResolverA.resolveDomainByUdp("","google.com")
+                    .stream().forEach(System.out::println);
         }
-        catch( DnsException e )
+        catch( DnsException de )
         {
-            System.out.println(e.getMessage());
+            System.out.println(de.getMessage());
         }
-        catch( InterruptedException ie )
+        catch( Exception e )
         {
-            System.out.println(ie.getMessage());
+            e.printStackTrace();
         }
     }
 }
