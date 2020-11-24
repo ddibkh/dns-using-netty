@@ -183,3 +183,5 @@ void mxResolveConfiguration()
     }
 }
 ```
+
+# 중복코드 제거를 위한 리팩토링 필요.
