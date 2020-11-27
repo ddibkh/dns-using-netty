@@ -17,12 +17,10 @@ auther : ddibkh
 description : TXT 레코드 결과 처리 핸들러
 reference : https://github.com/netty/netty/tree/4.1/example/src/main/java/io/netty/example/dns
  */
-@Slf4j
 public class DnsResponseHandlerTXT<T extends DnsResponse> extends DnsResponseHandler<T>
 {
     @Getter
     String domainName;
-    private List< DnsResult > listResult = new ArrayList<>();
 
     @Override
     public void exceptionCaught(ChannelHandlerContext ctx, Throwable cause)
@@ -35,8 +33,8 @@ public class DnsResponseHandlerTXT<T extends DnsResponse> extends DnsResponseHan
         else
             message = String.format("TXT handler exception caught, %s", cause.getMessage());
 
-        log.error("{}", message);
         ctx.close();
+        throw new DnsException(message);
     }
 
     public DnsResponseHandlerTXT(Class<T> classI)
@@ -52,24 +50,23 @@ public class DnsResponseHandlerTXT<T extends DnsResponse> extends DnsResponseHan
         {
             if (dnsResponse.count(DnsSection.QUESTION) > 0) {
                 DnsQuestion question = dnsResponse.recordAt(DnsSection.QUESTION, 0);
-                log.info("check TXT record : {}", question.name());
                 domainName = question.name();
             }
             else
                 domainName = "";
 
             int count = dnsResponse.count(DnsSection.ANSWER);
-            log.debug("TXT record answer count : {}", count);
 
             //error
             if( count == 0 )
             {
-                log.error("fail to TXT record domain '{}', {}", domainName, dnsResponse.code().toString());
                 throw new DnsException(dnsResponse.code().toString());
             }
             else
             {
-                for (int i = 0;  i < count; i++) {
+                List<DnsResult> results = new ArrayList<>();
+                for (int i = 0;  i < count; i++)
+                {
                     DnsRecord record = dnsResponse.recordAt(DnsSection.ANSWER, i);
                     if (record.type() == DnsRecordType.TXT)
                     {
@@ -87,20 +84,16 @@ public class DnsResponseHandlerTXT<T extends DnsResponse> extends DnsResponseHan
                         }
                         //read 2byte
                         DnsResult txtResult = new DnsResult(DnsResult.Type.TXT, sb.toString());
-                        listResult.add(txtResult);
+                        results.add(txtResult);
                     }
                 }
+
+                channelHandlerContext.channel().attr(TXT_RECORD_RESULT).set(results);
             }
         }
         finally
         {
             channelHandlerContext.close();
         }
-    }
-
-    @Override
-    public List<DnsResult> getResult()
-    {
-        return listResult;
     }
 }

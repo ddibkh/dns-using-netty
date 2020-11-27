@@ -11,18 +11,15 @@ import io.netty.handler.codec.dns.*;
 import io.netty.handler.timeout.ReadTimeoutException;
 import io.netty.handler.timeout.WriteTimeoutException;
 import lombok.Getter;
-import lombok.extern.slf4j.Slf4j;
 import netty.dns.result.DnsResult;
 
 import java.util.ArrayList;
 import java.util.List;
 
-@Slf4j
 public class DnsResponseHandlerNS<T extends DnsResponse> extends DnsResponseHandler<T>
 {
     @Getter
     private String domainName;
-    private List< DnsResult > listResult = new ArrayList<>();
 
     public DnsResponseHandlerNS(Class<T> classI)
     {
@@ -40,8 +37,8 @@ public class DnsResponseHandlerNS<T extends DnsResponse> extends DnsResponseHand
         else
             message = String.format("NS handler exception caught, %s", cause.getMessage());
 
-        log.error("{}", message);
         ctx.close();
+        throw new DnsException(message);
     }
 
     @Override
@@ -52,41 +49,37 @@ public class DnsResponseHandlerNS<T extends DnsResponse> extends DnsResponseHand
         {
             if (dnsResponse.count(DnsSection.QUESTION) > 0) {
                 DnsQuestion question = dnsResponse.recordAt(DnsSection.QUESTION, 0);
-                log.info("check NS record : {}", question.name());
                 domainName = question.name();
             }
             else
                 domainName = "";
 
             int count = dnsResponse.count(DnsSection.ANSWER);
-            log.debug("A record answer count : {}", count);
 
             //error
             if( count == 0 )
             {
-                log.error("fail to A record domain '{}', {}", domainName, dnsResponse.code().toString());
                 throw new DnsException(dnsResponse.code().toString());
             }
             else
             {
-                for (int i = 0;  i < count; i++) {
+                List<DnsResult> results = new ArrayList<>();
+                for (int i = 0;  i < count; i++)
+                {
                     DnsRecord record = dnsResponse.recordAt(DnsSection.ANSWER, i);
                     if (record.type() == DnsRecordType.NS) {
                         DnsRawRecord raw = (DnsRawRecord) record;
                         DnsResult nsResult = new DnsResult(DnsResult.Type.NS, DefaultDnsRecordDecoder.decodeName(raw.content()));
-                        listResult.add(nsResult);
+                        results.add(nsResult);
                     }
                 }
+
+                channelHandlerContext.channel().attr(NS_RECORD_RESULT).set(results);
             }
         }
         finally
         {
             channelHandlerContext.close();
         }
-    }
-
-    public List<DnsResult> getResult()
-    {
-        return listResult;
     }
 }

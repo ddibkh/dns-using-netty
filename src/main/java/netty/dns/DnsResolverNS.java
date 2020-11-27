@@ -12,7 +12,6 @@ import io.netty.handler.codec.dns.*;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import netty.dns.handler.DnsException;
-import netty.dns.handler.DnsResponseHandlerNS;
 import netty.dns.result.DnsResult;
 import org.springframework.context.annotation.Lazy;
 import org.springframework.stereotype.Component;
@@ -20,7 +19,8 @@ import org.springframework.stereotype.Component;
 import java.net.InetSocketAddress;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
-import java.util.stream.Collectors;
+
+import static netty.dns.handler.DnsResponseHandler.NS_RECORD_RESULT;
 
 @Component("dnsResolverNS")
 @RequiredArgsConstructor
@@ -85,10 +85,7 @@ public class DnsResolverNS implements DnsResolver
             throw new DnsException("fail to resolve NS record, interrupted exception");
         }
 
-        List< DnsResult > list = ch.pipeline().get(DnsResponseHandlerNS.class).getResult();
-        return list.stream()
-                .map(a -> new DnsResult(a.getType(), a.getRecord()))
-                .collect(Collectors.toList());
+        return ch.attr(NS_RECORD_RESULT).get();
     }
 
     public List<DnsResult> resolveDomainByUdp(String dnsIp, String domainName) throws DnsException
@@ -136,9 +133,6 @@ public class DnsResolverNS implements DnsResolver
             throw new DnsException("fail to resolve NS record, interrupted exception");
         }
 
-        List<DnsResult> list = ch.pipeline().get(DnsResponseHandlerNS.class).getResult();
-        return list.stream()
-                .map(a -> new DnsResult(a.getType(), a.getRecord()))
-                .collect(Collectors.toList());
+        return ch.attr(NS_RECORD_RESULT).get();
     }
 }

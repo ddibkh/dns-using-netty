@@ -22,6 +22,8 @@ import java.util.List;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 
+import static netty.dns.handler.DnsResponseHandler.A_RECORD_RESULT;
+
 @Component("dnsResolverA")
 @RequiredArgsConstructor
 @Slf4j
@@ -85,10 +87,7 @@ public class DnsResolverA implements DnsResolver
             throw new DnsException("fail to resolve A record, interrupted exception");
         }
 
-        List< DnsResult > list = ch.pipeline().get(DnsResponseHandlerA.class).getResult();
-        return list.stream()
-                .map(a -> new DnsResult(a.getType(), a.getRecord()))
-                .collect(Collectors.toList());
+        return ch.attr(A_RECORD_RESULT).get();
     }
 
     public List<DnsResult> resolveDomainByUdp(String dnsIp, String domainName) throws DnsException
@@ -136,9 +135,6 @@ public class DnsResolverA implements DnsResolver
             throw new DnsException("fail to resolve A record, interrupted exception");
         }
 
-        List<DnsResult> list = ch.pipeline().get(DnsResponseHandlerA.class).getResult();
-        return list.stream()
-                .map(a -> new DnsResult(a.getType(), a.getRecord()))
-                .collect(Collectors.toList());
+        return ch.attr(A_RECORD_RESULT).get();
     }
 }

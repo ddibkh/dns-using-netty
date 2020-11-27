@@ -6,7 +6,6 @@ import io.netty.handler.codec.dns.*;
 import io.netty.handler.timeout.ReadTimeoutException;
 import io.netty.handler.timeout.WriteTimeoutException;
 import lombok.Getter;
-import lombok.extern.slf4j.Slf4j;
 import netty.dns.result.MXResult;
 
 import java.util.ArrayList;
@@ -19,12 +18,10 @@ auther : ddibkh
 description : MX 레코드 결과 처리 핸들러
 reference : https://github.com/netty/netty/tree/4.1/example/src/main/java/io/netty/example/dns
  */
-@Slf4j
 public class DnsResponseHandlerMX<T extends DnsResponse> extends DnsResponseHandler<T>
 {
     @Getter
     private String domainName;
-    private List< MXResult > listResult = new ArrayList<>();
 
     public DnsResponseHandlerMX(Class<T> classI)
     {
@@ -42,8 +39,8 @@ public class DnsResponseHandlerMX<T extends DnsResponse> extends DnsResponseHand
         else
             message = String.format("MX handler exception caught, %s", cause.getMessage());
 
-        log.error("{}", message);
         ctx.close();
+        throw new DnsException(message);
     }
 
     @Override
@@ -54,24 +51,23 @@ public class DnsResponseHandlerMX<T extends DnsResponse> extends DnsResponseHand
         {
             if (dnsResponse.count(DnsSection.QUESTION) > 0) {
                 DnsQuestion question = dnsResponse.recordAt(DnsSection.QUESTION, 0);
-                log.info("check MX record : {}", question.name());
                 domainName = question.name();
             }
             else
                 domainName = "";
 
             int count = dnsResponse.count(DnsSection.ANSWER);
-            log.debug("MX record answer count : {}", count);
 
             //error
             if( count == 0 )
             {
-                log.error("fail to MX record domain '{}', {}", domainName, dnsResponse.code().toString());
                 throw new DnsException(dnsResponse.code().toString());
             }
             else
             {
-                for (int i = 0;  i < count; i++) {
+                List<MXResult> results = new ArrayList<>();
+                for (int i = 0;  i < count; i++)
+                {
                     DnsRecord record = dnsResponse.recordAt(DnsSection.ANSWER, i);
                     if (record.type() == DnsRecordType.MX) {
                         //just print the IP after query
@@ -80,25 +76,20 @@ public class DnsResponseHandlerMX<T extends DnsResponse> extends DnsResponseHand
                         //preference(2bytes) hostname
                         MXResult mxResult = new MXResult(
                                 content.readUnsignedShort(), DefaultDnsRecordDecoder.decodeName(content));
-                        listResult.add(mxResult);
+                        results.add(mxResult);
                     }
                 }
 
                 //sorting by preference (1. preference, 2. hostname)
                 Comparator< MXResult > comparator =
                         Comparator.comparingInt(MXResult::getPreference).thenComparing(MXResult::getRecord);
-                listResult = listResult.stream().sorted(comparator).collect(Collectors.toList());
+                results = results.stream().sorted(comparator).collect(Collectors.toList());
+                channelHandlerContext.channel().attr(MX_RECORD_RESULT).set(results);
             }
         }
         finally
         {
             channelHandlerContext.close();
         }
-    }
-
-    @Override
-    public List<MXResult> getResult()
-    {
-        return listResult;
     }
 }

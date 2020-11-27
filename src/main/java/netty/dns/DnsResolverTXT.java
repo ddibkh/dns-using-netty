@@ -22,6 +22,9 @@ import java.util.List;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 
+import static netty.dns.handler.DnsResponseHandler.NS_RECORD_RESULT;
+import static netty.dns.handler.DnsResponseHandler.TXT_RECORD_RESULT;
+
 @Component("dnsResolverTXT")
 @RequiredArgsConstructor
 @Slf4j
@@ -85,10 +88,7 @@ public class DnsResolverTXT implements DnsResolver
             throw new DnsException("fail to resolve TXT record, interrupted exception");
         }
 
-        List< DnsResult > list = ch.pipeline().get(DnsResponseHandlerTXT.class).getResult();
-        return list.stream()
-                .map(txt -> new DnsResult(txt.getType(), txt.getRecord()))
-                .collect(Collectors.toList());
+        return ch.attr(TXT_RECORD_RESULT).get();
     }
 
     public List< DnsResult > resolveDomainByUdp(String dnsIp, String domainName) throws DnsException
@@ -136,9 +136,6 @@ public class DnsResolverTXT implements DnsResolver
             throw new DnsException("fail to resolve TXT record, interrupted exception");
         }
 
-        List< DnsResult > list = ch.pipeline().get(DnsResponseHandlerTXT.class).getResult();
-        return list.stream()
-                .map(txt -> new DnsResult(txt.getType(), txt.getRecord()))
-                .collect(Collectors.toList());
+        return ch.attr(TXT_RECORD_RESULT).get();
     }
 }

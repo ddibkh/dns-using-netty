@@ -12,8 +12,6 @@ import io.netty.handler.codec.dns.*;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import netty.dns.handler.DnsException;
-import netty.dns.handler.DnsResponseHandlerMX;
-import netty.dns.result.DnsResult;
 import netty.dns.result.MXResult;
 import org.springframework.context.annotation.Lazy;
 import org.springframework.stereotype.Component;
@@ -21,7 +19,8 @@ import org.springframework.stereotype.Component;
 import java.net.InetSocketAddress;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
-import java.util.stream.Collectors;
+
+import static netty.dns.handler.DnsResponseHandler.MX_RECORD_RESULT;
 
 @Component("dnsResolverMX")
 @RequiredArgsConstructor
@@ -32,7 +31,7 @@ public class DnsResolverMX implements DnsResolver
     private final Bootstrap tcpMxBootstrap;
     private final Bootstrap udpMxBootstrap;
 
-    public List< DnsResult > resolveDomainByTcp(String dnsIp, String domainName) throws DnsException
+    public List< MXResult > resolveDomainByTcp(String dnsIp, String domainName) throws DnsException
     {
         if( dnsIp.isEmpty() )
             dnsIp = "8.8.8.8";
@@ -86,13 +85,10 @@ public class DnsResolverMX implements DnsResolver
             throw new DnsException("fail to resolve MX record, interrupted exception");
         }
 
-        List<MXResult> list = ch.pipeline().get(DnsResponseHandlerMX.class).getResult();
-        return list.stream()
-                .map(mx -> new MXResult(mx.getPreference(), mx.getRecord()))
-                .collect(Collectors.toList());
+        return ch.attr(MX_RECORD_RESULT).get();
     }
 
-    public List< DnsResult > resolveDomainByUdp(String dnsIp, String domainName) throws DnsException
+    public List< MXResult > resolveDomainByUdp(String dnsIp, String domainName) throws DnsException
     {
         if( dnsIp.isEmpty() )
             dnsIp = "8.8.8.8";
@@ -137,9 +133,6 @@ public class DnsResolverMX implements DnsResolver
             throw new DnsException("fail to resolve MX record, interrupted exception");
         }
 
-        List<MXResult> list = ch.pipeline().get(DnsResponseHandlerMX.class).getResult();
-        return list.stream()
-                .map(mx -> new MXResult(mx.getPreference(), mx.getRecord()))
-                .collect(Collectors.toList());
+        return ch.attr(MX_RECORD_RESULT).get();
     }
 }
