@@ -6,11 +6,10 @@ import io.netty.handler.codec.dns.*;
 import io.netty.handler.timeout.ReadTimeoutException;
 import io.netty.handler.timeout.WriteTimeoutException;
 import lombok.Getter;
-import netty.dns.result.MXResult;
+import netty.dns.exception.DnsException;
+import netty.dns.result.DnsResult;
 
-import java.util.ArrayList;
-import java.util.Comparator;
-import java.util.List;
+import java.util.*;
 import java.util.stream.Collectors;
 
 /*
@@ -39,57 +38,66 @@ public class DnsResponseHandlerMX<T extends DnsResponse> extends DnsResponseHand
         else
             message = String.format("MX handler exception caught, %s", cause.getMessage());
 
+        DnsResult dnsResult = new DnsResult(DnsResult.Type.MX, domainName, Collections.emptyList());
+        ctx.channel().attr(RECORD_RESULT).set(dnsResult);
+        ctx.channel().attr(ERROR_MSG).set(message);
         ctx.close();
-        throw new DnsException(message);
     }
 
     @Override
     protected void channelRead0(ChannelHandlerContext channelHandlerContext,
                                 T dnsResponse) throws DnsException
     {
-        try
+        if (dnsResponse.count(DnsSection.QUESTION) > 0) {
+            DnsQuestion question = dnsResponse.recordAt(DnsSection.QUESTION, 0);
+            domainName = question.name();
+        }
+        else
+            domainName = "";
+
+        int count = dnsResponse.count(DnsSection.ANSWER);
+
+        //error
+        if( count == 0 )
         {
-            if (dnsResponse.count(DnsSection.QUESTION) > 0) {
-                DnsQuestion question = dnsResponse.recordAt(DnsSection.QUESTION, 0);
-                domainName = question.name();
-            }
-            else
-                domainName = "";
-
-            int count = dnsResponse.count(DnsSection.ANSWER);
-
-            //error
-            if( count == 0 )
+            throw new DnsException(dnsResponse.code().toString());
+        }
+        else
+        {
+            Comparator<Integer> comparator = Comparator.comparingInt(i -> i);
+            Map<Integer, List<String> > map = new TreeMap<>(comparator);
+            //List<MXResult> results = new ArrayList<>();
+            List<String> results;
+            for (int i = 0;  i < count; i++)
             {
-                throw new DnsException(dnsResponse.code().toString());
-            }
-            else
-            {
-                List<MXResult> results = new ArrayList<>();
-                for (int i = 0;  i < count; i++)
-                {
-                    DnsRecord record = dnsResponse.recordAt(DnsSection.ANSWER, i);
-                    if (record.type() == DnsRecordType.MX) {
-                        //just print the IP after query
-                        DnsRawRecord raw = (DnsRawRecord) record;
-                        ByteBuf content = raw.content();
-                        //preference(2bytes) hostname
-                        MXResult mxResult = new MXResult(
-                                content.readUnsignedShort(), DefaultDnsRecordDecoder.decodeName(content));
-                        results.add(mxResult);
+                DnsRecord mxrecord = dnsResponse.recordAt(DnsSection.ANSWER, i);
+                if (mxrecord.type() == DnsRecordType.MX) {
+                    //just print the IP after query
+                    DnsRawRecord raw = (DnsRawRecord) mxrecord;
+                    ByteBuf content = raw.content();
+                    //preference(2bytes) hostname
+                    Integer preference = content.readUnsignedShort();
+                    String record = DefaultDnsRecordDecoder.decodeName(content);
+
+                    if( map.containsKey(preference) )
+                    {
+                        map.get(preference).add(record);
+                    }
+                    else
+                    {
+                        List<String> list = new ArrayList<>();
+                        list.add(record);
+                        map.put(preference, list);
                     }
                 }
-
-                //sorting by preference (1. preference, 2. hostname)
-                Comparator< MXResult > comparator =
-                        Comparator.comparingInt(MXResult::getPreference).thenComparing(MXResult::getRecord);
-                results = results.stream().sorted(comparator).collect(Collectors.toList());
-                channelHandlerContext.channel().attr(MX_RECORD_RESULT).set(results);
             }
+
+            results = map.entrySet().stream().flatMap(entry -> entry.getValue().stream()).collect(Collectors.toList());
+
+            DnsResult mxResult = new DnsResult(DnsResult.Type.MX, domainName, results);
+            channelHandlerContext.channel().attr(RECORD_RESULT).set(mxResult);
         }
-        finally
-        {
-            channelHandlerContext.close();
-        }
+
+        channelHandlerContext.close();
     }
 }

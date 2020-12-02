@@ -1,6 +1,11 @@
 package netty.dns;
 
-import netty.dns.handler.DnsException;
+import netty.dns.configuration.BootstrapFactory;
+import netty.dns.configuration.DnsConfiguration;
+import netty.dns.exception.DnsException;
+import netty.dns.resolver.DnsResolver;
+import netty.dns.resolver.DnsResolverImpl;
+import netty.dns.resolver.RequestType;
 import netty.dns.result.DnsResult;
 import org.junit.jupiter.api.Test;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -15,13 +20,14 @@ import java.util.stream.Collectors;
 
 @SpringBootTest( classes = {
         DnsConfiguration.class,
+        BootstrapFactory.class,
         DnsResolver.class,
-        DnsResolverMX.class,
+        DnsResolverImpl.class
 } )
 class DnsResolverMXTest
 {
-    @Resource(name = "dnsResolverMX")
-    private DnsResolver dnsResolver;
+    @Resource(name="dnsResolverImpl")
+    private DnsResolverImpl dnsResolverImpl;
 
     @Test
     void dnsResolveAsync()
@@ -38,11 +44,11 @@ class DnsResolverMXTest
                 domainName = "kakao.com";
 
             CompletableFuture< Void > completableFuture = CompletableFuture.supplyAsync(() ->
-                    dnsResolver.resolveDomainByTcp("", domainName))
+                    dnsResolverImpl.resolveDomainByTcp("", domainName, RequestType.REQUEST_MX))
                     .exceptionally(throwable ->
                     {
                         System.out.println("exceptionally : " + throwable.getMessage());
-                        return Collections.emptyList();
+                        return new DnsResult(DnsResult.Type.MX, domainName, Collections.emptyList());
                     })
                     .thenAccept(System.out::println);
 
@@ -77,8 +83,8 @@ class DnsResolverMXTest
             else
                 domainName = "kakao.com";
 
-            List< DnsResult > list = dnsResolver.resolveDomainByUdp("", domainName);
-            list.forEach(System.out::println);
+            DnsResult result = dnsResolverImpl.resolveDomainByUdp("", domainName, RequestType.REQUEST_MX);
+            System.out.println(result);
         }
     }
 }

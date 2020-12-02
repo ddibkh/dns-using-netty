@@ -4,9 +4,9 @@ description : DNS resolver
 reference : https://github.com/netty/netty/tree/4.1/example/src/main/java/io/netty/example/dns
  */
 
-package netty.dns;
+package netty.dns.resolver;
 
-import netty.dns.handler.DnsException;
+import netty.dns.exception.DnsException;
 import netty.dns.result.DnsResult;
 
 import java.util.List;
@@ -19,8 +19,8 @@ public interface DnsResolver
         return (short)new Random().nextInt(1 << 15);
     }
 
-    <T extends DnsResult > List< T >
-    resolveDomainByTcp(String dnsServer, String domainName) throws DnsException;
-    <T extends DnsResult> List< T >
-    resolveDomainByUdp(String dnsServer, String domainName) throws DnsException;
+    <T extends DnsResult > T
+    resolveDomainByTcp(String dnsIp, String domainName, RequestType requestType) throws DnsException;
+    <T extends DnsResult > T
+    resolveDomainByUdp(String dnsIp, String domainName, RequestType requestType) throws DnsException;
 }

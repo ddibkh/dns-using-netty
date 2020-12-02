@@ -1,4 +1,4 @@
-package netty.dns.handler;
+package netty.dns.exception;
 
 public class DnsException extends RuntimeException
 {

@@ -1,4 +1,4 @@
-package netty.dns;
+package netty.dns.configuration;
 
 import io.netty.bootstrap.Bootstrap;
 import io.netty.channel.ChannelInitializer;

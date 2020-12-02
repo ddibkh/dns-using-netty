@@ -13,12 +13,12 @@ import io.netty.handler.timeout.ReadTimeoutException;
 import io.netty.handler.timeout.WriteTimeoutException;
 import io.netty.util.NetUtil;
 import lombok.Getter;
+import netty.dns.exception.DnsException;
 import netty.dns.result.DnsResult;
 
 import java.util.ArrayList;
-import java.util.Comparator;
+import java.util.Collections;
 import java.util.List;
-import java.util.stream.Collectors;
 
 public class DnsResponseHandlerA<T extends DnsResponse> extends DnsResponseHandler<T>
 {
@@ -36,8 +36,12 @@ public class DnsResponseHandlerA<T extends DnsResponse> extends DnsResponseHandl
         else
             message = String.format("A handler exception caught, %s", cause.getMessage());
 
+        //close 이전에 attribute 를 set 해야한다.
+        DnsResult dnsResult = new DnsResult(DnsResult.Type.A, domainName, Collections.emptyList());
+        ctx.channel().attr(RECORD_RESULT).set(dnsResult);
+        ctx.channel().attr(ERROR_MSG).set(message);
+
         ctx.close();
-        throw new DnsException(message);
     }
 
     public DnsResponseHandlerA(Class<T> classI)
@@ -49,46 +53,36 @@ public class DnsResponseHandlerA<T extends DnsResponse> extends DnsResponseHandl
     protected void channelRead0(ChannelHandlerContext channelHandlerContext,
                                 T dnsResponse)
     {
-        try
+        if (dnsResponse.count(DnsSection.QUESTION) > 0) {
+            DnsQuestion question = dnsResponse.recordAt(DnsSection.QUESTION, 0);
+            domainName = question.name();
+        }
+        else
+            domainName = "";
+
+        int count = dnsResponse.count(DnsSection.ANSWER);
+
+        //error
+        if( count == 0 )
         {
-            if (dnsResponse.count(DnsSection.QUESTION) > 0) {
-                DnsQuestion question = dnsResponse.recordAt(DnsSection.QUESTION, 0);
-                domainName = question.name();
-            }
-            else
-                domainName = "";
-
-            int count = dnsResponse.count(DnsSection.ANSWER);
-
-            //error
-            if( count == 0 )
+            throw new DnsException(dnsResponse.code().toString());
+        }
+        else
+        {
+            List<String> results = new ArrayList<>();
+            for (int i = 0;  i < count; i++)
             {
-                throw new DnsException(dnsResponse.code().toString());
-            }
-            else
-            {
-                List<DnsResult> results = new ArrayList<>();
-                for (int i = 0;  i < count; i++)
-                {
-                    DnsRecord record = dnsResponse.recordAt(DnsSection.ANSWER, i);
-                    if (record.type() == DnsRecordType.A) {
-                        DnsRawRecord raw = (DnsRawRecord) record;
-                        DnsResult aResult = new DnsResult(DnsResult.Type.A,
-                                NetUtil.bytesToIpAddress(ByteBufUtil.getBytes(raw.content())));
-                        results.add(aResult);
-                    }
+                DnsRecord record = dnsResponse.recordAt(DnsSection.ANSWER, i);
+                if (record.type() == DnsRecordType.A) {
+                    DnsRawRecord raw = (DnsRawRecord) record;
+                    results.add(NetUtil.bytesToIpAddress(ByteBufUtil.getBytes(raw.content())));
                 }
-
-                //sorting by preference
-                Comparator< DnsResult > comparator =
-                        Comparator.comparing(DnsResult::getRecord);
-                results = results.stream().sorted(comparator).collect(Collectors.toList());
-                channelHandlerContext.channel().attr(A_RECORD_RESULT).set(results);
             }
+
+            DnsResult aResult = new DnsResult(DnsResult.Type.A, domainName, results);
+            channelHandlerContext.channel().attr(RECORD_RESULT).set(aResult);
         }
-        finally
-        {
-            channelHandlerContext.close();
-        }
+
+        channelHandlerContext.close();
     }
 }

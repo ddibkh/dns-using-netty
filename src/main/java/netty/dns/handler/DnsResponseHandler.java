@@ -6,7 +6,6 @@ import io.netty.handler.codec.dns.DnsResponse;
 import io.netty.util.AttributeKey;
 import lombok.Getter;
 import netty.dns.result.DnsResult;
-import netty.dns.result.MXResult;
 
 import java.util.List;
 
@@ -17,10 +16,10 @@ public abstract class DnsResponseHandler<T extends DnsResponse> extends SimpleCh
     기존의 handler 에서 getResult 를 호출시에 이미 context 가 close 상태이기 때문에
     handler 가 이미 소멸된 경우 null pointer exception 이 발생한다.
      */
-    public final static AttributeKey<List< DnsResult >> A_RECORD_RESULT = AttributeKey.valueOf("aresult");
-    public final static AttributeKey<List< MXResult >> MX_RECORD_RESULT = AttributeKey.valueOf("mxresult");
-    public final static AttributeKey<List< DnsResult >> TXT_RECORD_RESULT = AttributeKey.valueOf("txtresult");
-    public final static AttributeKey<List< DnsResult >> NS_RECORD_RESULT = AttributeKey.valueOf("nsresult");
+
+    public final static AttributeKey<DnsResult> RECORD_RESULT = AttributeKey.valueOf("record_result");
+    public final static AttributeKey<String> ERROR_MSG = AttributeKey.valueOf("errormsg");
+
     @Getter
     private final DnsRecordType recordType;
 

@@ -6,10 +6,11 @@ import io.netty.handler.codec.dns.*;
 import io.netty.handler.timeout.ReadTimeoutException;
 import io.netty.handler.timeout.WriteTimeoutException;
 import lombok.Getter;
-import lombok.extern.slf4j.Slf4j;
+import netty.dns.exception.DnsException;
 import netty.dns.result.DnsResult;
 
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 
 /*
@@ -33,8 +34,10 @@ public class DnsResponseHandlerTXT<T extends DnsResponse> extends DnsResponseHan
         else
             message = String.format("TXT handler exception caught, %s", cause.getMessage());
 
+        DnsResult dnsResult = new DnsResult(DnsResult.Type.TXT, domainName, Collections.emptyList());
+        ctx.channel().attr(RECORD_RESULT).set(dnsResult);
+        ctx.channel().attr(ERROR_MSG).set(message);
         ctx.close();
-        throw new DnsException(message);
     }
 
     public DnsResponseHandlerTXT(Class<T> classI)
@@ -46,54 +49,49 @@ public class DnsResponseHandlerTXT<T extends DnsResponse> extends DnsResponseHan
     protected void channelRead0(ChannelHandlerContext channelHandlerContext,
                                 T dnsResponse)
     {
-        try
+        if (dnsResponse.count(DnsSection.QUESTION) > 0) {
+            DnsQuestion question = dnsResponse.recordAt(DnsSection.QUESTION, 0);
+            domainName = question.name();
+        }
+        else
+            domainName = "";
+
+        int count = dnsResponse.count(DnsSection.ANSWER);
+
+        //error
+        if( count == 0 )
         {
-            if (dnsResponse.count(DnsSection.QUESTION) > 0) {
-                DnsQuestion question = dnsResponse.recordAt(DnsSection.QUESTION, 0);
-                domainName = question.name();
-            }
-            else
-                domainName = "";
-
-            int count = dnsResponse.count(DnsSection.ANSWER);
-
-            //error
-            if( count == 0 )
+            throw new DnsException(dnsResponse.code().toString());
+        }
+        else
+        {
+            List<String> results = new ArrayList<>();
+            for (int i = 0;  i < count; i++)
             {
-                throw new DnsException(dnsResponse.code().toString());
-            }
-            else
-            {
-                List<DnsResult> results = new ArrayList<>();
-                for (int i = 0;  i < count; i++)
+                DnsRecord txtrecord = dnsResponse.recordAt(DnsSection.ANSWER, i);
+                if (txtrecord.type() == DnsRecordType.TXT)
                 {
-                    DnsRecord record = dnsResponse.recordAt(DnsSection.ANSWER, i);
-                    if (record.type() == DnsRecordType.TXT)
+                    DnsRawRecord raw = (DnsRawRecord) txtrecord;
+                    ByteBuf content = raw.content();
+                    StringBuilder sb = new StringBuilder();
+                    while( content.readableBytes() > 0 )
                     {
-                        DnsRawRecord raw = (DnsRawRecord) record;
-                        ByteBuf content = raw.content();
-                        StringBuilder sb = new StringBuilder();
-                        while( content.readableBytes() > 0 )
-                        {
-                            //get record length (2byte)
-                            int readLen = content.readUnsignedByte();
-                            byte[] bytes = new byte[readLen];
-                            ByteBuf bb = content.readBytes(readLen);
-                            bb.readBytes(bytes);
-                            sb.append(new String(bytes));
-                        }
-                        //read 2byte
-                        DnsResult txtResult = new DnsResult(DnsResult.Type.TXT, sb.toString());
-                        results.add(txtResult);
+                        //get record length (2byte)
+                        int readLen = content.readUnsignedByte();
+                        byte[] bytes = new byte[readLen];
+                        ByteBuf bb = content.readBytes(readLen);
+                        bb.readBytes(bytes);
+                        sb.append(new String(bytes));
                     }
-                }
 
-                channelHandlerContext.channel().attr(TXT_RECORD_RESULT).set(results);
+                    results.add(sb.toString());
+                }
             }
+
+            DnsResult txtResult = new DnsResult(DnsResult.Type.TXT, domainName, results);
+            channelHandlerContext.channel().attr(RECORD_RESULT).set(txtResult);
         }
-        finally
-        {
-            channelHandlerContext.close();
-        }
+
+        channelHandlerContext.close();
     }
 }
