@@ -134,53 +134,21 @@ List<DnsResult> 를 이용한다. (MX 레코드 조회의 경우 preference 값�
 List<MXRecord> 로 결과를 받아 사용한다.)
  
 
-## example (DnsResolverTest.java 참조)
+## example (test/java/netty/dns/test 소스코드 참조)
 # TCP MX 레코드 조회
 ```
-@Resource(name="dnsResolverMX")
-private DnsResolver dnsResolverMX;
+@Resource(name="dnsResolverImpl")
+private DnsResolverImpl dnsResolverImpl;
 
-@Test
-void mxResolveConfiguration()
-{
-    try
-    {
-        dnsResolverMX.resolveDomainByTcp("","google.com")
-                .stream().forEach(System.out::println);
-    }
-    catch( DnsException de )
-    {
-        System.out.println(de.getMessage());
-    }
-    catch( Exception e )
-    {
-        System.out.println(e.getMessage());
-        e.printStackTrace();
-    }
-}
+DnsResult result = dnsResolverImpl.resolveDomainByTcp("", "aaa.com", RequestType.REQUEST_MX);
+System.out.println(result);
 ```
 # UDP MX 레코드 조회
 ```
-@Resource(name="dnsResolverMX")
-private DnsResolver dnsResolverMX;
+@Resource(name="dnsResolverImpl")
+private DnsResolverImpl dnsResolverImpl;
 
-@Test
-void mxResolveConfiguration()
-{
-    try
-    {
-        dnsResolverMX.resolveDomainByUdp("","google.com")
-                .stream().forEach(System.out::println);
-    }
-    catch( DnsException de )
-    {
-        System.out.println(de.getMessage());
-    }
-    catch( Exception e )
-    {
-        System.out.println(e.getMessage());
-        e.printStackTrace();
-    }
-}
+DnsResult result = dnsResolverImpl.resolveDomainByUdp("", "aaa.com", RequestType.REQUEST_MX);
+System.out.println(result);
 ```
 
