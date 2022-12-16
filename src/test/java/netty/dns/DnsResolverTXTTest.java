@@ -33,15 +33,15 @@ class DnsResolverTXTTest
     void dnsResolveAsync()
     {
         List< CompletableFuture< Void > > listFuture = new ArrayList<>();
-        for( int i = 0; i < 100; i++ )
+        for( int i = 0; i < 3; i++ )
         {
             String domainName;
             if( i % 3 == 0 )
-                domainName = "naver.com";
+                domainName = "test-domain-1";
             else if( i % 3 == 1 )
-                domainName = "google.com";
+                domainName = "test-domain-2";
             else
-                domainName = "kakao.com";
+                domainName = "test-domain-3";
 
             CompletableFuture< Void > completableFuture = CompletableFuture.supplyAsync(() ->
                     dnsResolverImpl.resolveDomainByTcp("", domainName, RequestType.REQUEST_TXT))
@@ -73,15 +73,15 @@ class DnsResolverTXTTest
     @Test
     void dnsResolveSync()
     {
-        for( int i = 0; i < 100; i++ )
+        for( int i = 0; i < 3; i++ )
         {
             String domainName;
             if( i % 3 == 0 )
-                domainName = "naver.com";
+                domainName = "test-domain-1";
             else if( i % 3 == 1 )
-                domainName = "google.com";
+                domainName = "test-domain-2";
             else
-                domainName = "kakao.com";
+                domainName = "test-domain-3";
 
             DnsResult result = dnsResolverImpl.resolveDomainByUdp("", domainName, RequestType.REQUEST_TXT);
             System.out.println(result);
